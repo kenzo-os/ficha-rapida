@@ -4,25 +4,41 @@ import com.devficha.ficharapida.business.entities.FichaAtendimento;
 import com.devficha.ficharapida.infrastructure.repository.FichaAtendimentoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class FichaService {
-    @Autowired
-    private FichaAtendimentoRepository fichaAtendimentoRepository;
 
-    public List<FichaAtendimento> listarTodas(){
-        return fichaAtendimentoRepository.findAll();
+    @Autowired
+    private FichaAtendimentoRepository fichaRepository;
+
+    @Transactional
+    public FichaAtendimento salvar(FichaAtendimento ficha) {
+        return fichaRepository.save(ficha);
     }
-    public FichaAtendimento salvar(FichaAtendimento fichaAtendimento){
-        return fichaAtendimentoRepository.save(fichaAtendimento);
+
+    public FichaAtendimento buscarPorId(Long id) {
+        return fichaRepository.findById(id).orElse(null);
     }
-    public void deletar (Long id){
-        fichaAtendimentoRepository.deleteById(id);
+
+    public List<FichaAtendimento> listarTodas() {
+        return fichaRepository.findAll();
     }
-    public Optional<FichaAtendimento> buscarPorId(Long id){
-        return fichaAtendimentoRepository.findById(id);
+
+    @Transactional
+    public void deletar(Long id) {
+        fichaRepository.deleteById(id);
+    }
+
+    @Transactional
+    public FichaAtendimento atualizar(Long id, FichaAtendimento fichaAtualizada) {
+        FichaAtendimento fichaExistente = buscarPorId(id);
+        if (fichaExistente != null) {
+            fichaAtualizada.setId(id);
+            return fichaRepository.save(fichaAtualizada);
+        }
+        return null;
     }
 }

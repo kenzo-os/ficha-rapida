@@ -12,6 +12,7 @@ public interface FichaAtendimentoRepository extends JpaRepository<FichaAtendimen
 
     List<FichaAtendimento> findBySocorristaId(Long socorristaId);
 
-    List<FichaAtendimento> findByDataFicha(LocalDate data);
+    // Corrigido: o campo na entidade é 'dataAtendimento', não 'dataFicha'
+    List<FichaAtendimento> findByDataAtendimento(LocalDate data);
 
 }
