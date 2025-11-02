@@ -1,7 +1,7 @@
 package com.devficha.ficharapida.business.service;
 
 import com.devficha.ficharapida.business.entities.FichaAtendimento;
-import com.itextpdf.kernel.colors.ColorConstants;
+import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -10,16 +10,21 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.itextpdf.layout.properties.VerticalAlignment;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.io.IOException;
 
 @Service
 public class PdfService {
@@ -68,41 +73,71 @@ public class PdfService {
         }
     }
 
-    private void adicionarCabecalho(Document document, FichaAtendimento ficha) {
-        Table headerTable = new Table(UnitValue.createPercentArray(new float[]{40, 30, 30}))
+    private void adicionarCabecalho(Document document, FichaAtendimento ficha) throws IOException {
+        Table headerTable = new Table(UnitValue.createPercentArray(new float[]{25, 45, 30}))
                 .useAllAvailableWidth();
 
-        // Logo e título SAMU
-        Cell logoCell = new Cell()
+        // Célula 1: Logo SAMU (à esquerda)
+        Cell logoCell = new Cell();
+        
+        try {
+            // Carregar a imagem do logo
+            ClassPathResource imgResource = new ClassPathResource("static/images/samu-192_logo.png");
+            byte[] imageBytes = imgResource.getInputStream().readAllBytes();
+            Image logo = new Image(ImageDataFactory.create(imageBytes));
+            
+            // Ajustar o tamanho da imagem
+            logo.setWidth(139);
+            logo.setHeight(80);
+            
+            logoCell.add(logo);
+        } catch (IOException e) {
+            // Se não conseguir carregar a imagem, usa apenas texto
+            logoCell.add(new Paragraph("LOGO")
+                    .setFontSize(FONT_SIZE_TITLE)
+                    .setBold());
+        }
+        
+        logoCell.setBorder(Border.NO_BORDER)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setTextAlignment(TextAlignment.CENTER);
+
+        // Célula 2: Textos centrais (SAMU 192, FICHA DE ATENDIMENTO, USB)
+        Cell titleCell = new Cell()
                 .add(new Paragraph("SAMU 192")
                         .setFontSize(FONT_SIZE_TITLE)
-                        .setBold())
+                        .setBold()
+                        .setTextAlignment(TextAlignment.CENTER))
                 .add(new Paragraph("FICHA DE ATENDIMENTO")
                         .setFontSize(FONT_SIZE_MEDIUM)
-                        .setBold())
+                        .setBold()
+                        .setTextAlignment(TextAlignment.CENTER))
                 .add(new Paragraph("USB")
-                        .setFontSize(FONT_SIZE_NORMAL))
+                        .setFontSize(FONT_SIZE_NORMAL)
+                        .setTextAlignment(TextAlignment.CENTER))
                 .setBorder(Border.NO_BORDER)
-                .setVerticalAlignment(VerticalAlignment.MIDDLE);
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setTextAlignment(TextAlignment.CENTER);
 
-        // Data
+        // Célula 3: DATA, KM INICIAL e KM FINAL (à direita, empilhados)
         String dataFormatada = ficha.getDataAtendimento() != null
                 ? ficha.getDataAtendimento().format(DATE_FORMATTER)
                 : "";
-        Cell dataCell = new Cell()
-                .add(new Paragraph("DATA").setFontSize(FONT_SIZE_SMALL).setBold())
-                .add(new Paragraph(dataFormatada).setFontSize(FONT_SIZE_NORMAL))
-                .setBorder(new SolidBorder(1));
+        
+        Table rightTable = new Table(1).useAllAvailableWidth();
+        rightTable.addCell(createCell("DATA", dataFormatada, true));
+        rightTable.addCell(createCell("KM INICIAL", ficha.getKmInicial(), true));
+        rightTable.addCell(createCell("KM FINAL", ficha.getKmFinal(), true));
+        
+        Cell rightCell = new Cell()
+                .add(rightTable)
+                .setBorder(Border.NO_BORDER)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE);
 
-        // KM
-        Table kmTable = new Table(1).useAllAvailableWidth();
-        kmTable.addCell(createCell("KM INICIAL", ficha.getKmInicial(), true));
-        kmTable.addCell(createCell("KM FINAL", ficha.getKmFinal(), true));
-        Cell kmCell = new Cell().add(kmTable).setBorder(Border.NO_BORDER);
-
+        // Adicionar as três células à tabela do cabeçalho
         headerTable.addCell(logoCell);
-        headerTable.addCell(dataCell);
-        headerTable.addCell(kmCell);
+        headerTable.addCell(titleCell);
+        headerTable.addCell(rightCell);
 
         document.add(headerTable);
     }
@@ -252,11 +287,47 @@ public class PdfService {
         Table table = new Table(1).useAllAvailableWidth().setMarginTop(5);
         table.addCell(createHeaderCell("DESCRIÇÃO DA CENA:"));
         
-        Cell contentCell = new Cell()
+        // Criar uma tabela com 2 colunas: texto à esquerda e imagem à direita
+        Table contentTable = new Table(UnitValue.createPercentArray(new float[]{60, 40}))
+                .useAllAvailableWidth();
+        
+        // Célula com o texto da descrição
+        Cell textCell = new Cell()
                 .add(new Paragraph(ficha.getDescricaoCena() != null ? ficha.getDescricaoCena() : "")
                         .setFontSize(FONT_SIZE_NORMAL))
-                .setMinHeight(60)
-                .setBorder(new SolidBorder(1));
+                .setMinHeight(120)
+                .setBorder(Border.NO_BORDER)
+                .setPadding(3);
+        
+        // Célula com a imagem dos contornos do corpo
+        Cell imageCell = new Cell()
+                .setBorder(Border.NO_BORDER)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setTextAlignment(TextAlignment.CENTER);
+        
+        try {
+            ClassPathResource imgResource = new ClassPathResource("static/images/image_outlinehbody.png");
+            byte[] imageBytes = imgResource.getInputStream().readAllBytes();
+            Image bodyImage = new Image(ImageDataFactory.create(imageBytes));
+            
+            // Ajustar o tamanho da imagem para caber na célula
+            bodyImage.setWidth(140);
+            bodyImage.setHeight(110);
+            bodyImage.setHorizontalAlignment(HorizontalAlignment.CENTER);
+            
+            imageCell.add(bodyImage);
+        } catch (IOException e) {
+            // Se não conseguir carregar a imagem, deixa a célula vazia
+            imageCell.add(new Paragraph("").setFontSize(FONT_SIZE_SMALL));
+        }
+        
+        contentTable.addCell(textCell);
+        contentTable.addCell(imageCell);
+        
+        Cell contentCell = new Cell()
+                .add(contentTable)
+                .setBorder(new SolidBorder(1))
+                .setPadding(0);
         
         table.addCell(contentCell);
         document.add(table);
@@ -477,7 +548,7 @@ public class PdfService {
         table.addCell(createCarimboCell("RECEBIDO POR (CARIMBO)", ficha.getCarimboRecebidoPor()));
         table.addCell(createCarimboCell("TÉCNICO ENFERMAGEM (SAMU)", ficha.getCarimboTecnicoEnfermagem()));
         table.addCell(createCarimboCell("SOCORRISTA (SAMU)", 
-                ficha.getSocorrista() != null ? ficha.getSocorrista().getNome() : ""));
+                ficha.getSocorrista() != null ? ficha.getSocorrista().getCarimbo() : ""));
 
         document.add(table);
     }
